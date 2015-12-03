@@ -36,12 +36,10 @@ public class LR_BGD {
 	public static class MSEMapper extends Mapper<Object, Text, Text, FloatWritable> {
 		
 		public String[] weights;
-		public float sum; 
 
 		@Override
 		public void setup(Context context) throws IOException, InterruptedException {
 			
-			sum = 0;
 			try {
 				URI[] files = context.getCacheFiles();
 				if (files == null || files.length == 0) {
@@ -75,8 +73,7 @@ public class LR_BGD {
 			assert(strs.length == DIM + 1);
 			float y = Float.parseFloat(strs[DIM]);
 			float err = (logistic(weights, strs)-y);
-			sum+= err*err;
-			context.write(new Text("_"), new FloatWritable(sum));
+			context.write(new Text("_"), new FloatWritable(err*err));
 		}
 	}
 
