@@ -1,14 +1,11 @@
 package mobius;
 import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URISyntaxException;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.filecache.DistributedCache;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -17,7 +14,6 @@ import org.apache.hadoop.io.FloatWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
@@ -31,23 +27,19 @@ public class FileSysTest {
 		@Override
 		public void setup(Context context) throws IOException, InterruptedException {
 			try {
-				URI[] files = context.getCacheFiles();
-				if (files == null || files.length == 0) {
-					throw new RuntimeException("User information is not set in DistributedCache");
+				FileSystem fs = FileSystem.get(new URI("s3://finalapp"),context.getConfiguration());
+				FSDataInputStream in = fs.open(new Path("s3://finalapp/weight/data.txt"));
+				BufferedReader rdr = new BufferedReader(new InputStreamReader(in));
+				String line;
+				while ((line = rdr.readLine()) != null) {
+					// TODO: read in weights here
+					test = Float.parseFloat(line);
 				}
-				// Read all files in the DistributedCache
-				for (URI u : files) {
-					BufferedReader rdr = new BufferedReader(
-							new InputStreamReader(new FileInputStream(new File("./data.txt"))));
-					String line;
-					// For each record in the user file
-					while ((line = rdr.readLine()) != null) {
-						// TODO: read in weights here
-						test = Float.parseFloat(line);
-					}
-				}
+				in.close();
 			} catch (IOException e) {
 				throw new RuntimeException(e);
+			} catch (URISyntaxException e) {
+				e.printStackTrace();
 			}
 		}
 
@@ -63,26 +55,24 @@ public class FileSysTest {
 		FSDataOutputStream out;
 		Path weightPath;
 		String s;
+		float test;
 
 		@Override
 		public void setup(Context context) throws IOException, InterruptedException {
 			try {
-				URI[] files = context.getCacheFiles();
-				if (files == null || files.length == 0) {
-					throw new RuntimeException("User information is not set in DistributedCache");
+				FileSystem fs = FileSystem.get(new URI("s3://finalapp"),context.getConfiguration());
+				FSDataInputStream in = fs.open(new Path("s3://finalapp/weight/data.txt"));
+				BufferedReader rdr = new BufferedReader(new InputStreamReader(in));
+				String line;
+				while ((line = rdr.readLine()) != null) {
+					// TODO: read in weights here
+					test = Float.parseFloat(line);
 				}
-				// Read all files in the DistributedCache
-				for (URI u : files) {
-					BufferedReader rdr = new BufferedReader(
-							new InputStreamReader(new FileInputStream(new File("./data.txt"))));
-					String line;
-					// For each record in the user file
-					while ((line = rdr.readLine()) != null) {
-						// TODO: read in weights here
-					}
-				}
+				in.close();
 			} catch (IOException e) {
 				throw new RuntimeException(e);
+			} catch (URISyntaxException e) {
+				e.printStackTrace();
 			}
 		}
 
@@ -95,7 +85,7 @@ public class FileSysTest {
 		protected void cleanup(Context context) throws IOException, InterruptedException {
 			try {
 				fs = FileSystem.get(new URI("s3://finalapp"),context.getConfiguration());
-				weightPath = new Path("s3://finalapp/tmp/data.txt");
+				weightPath = new Path("s3://finalapp/weight/data.txt");
 				out = fs.create(weightPath);
 				out.write(s.getBytes());
 				out.close();
@@ -108,18 +98,18 @@ public class FileSysTest {
 
 	public static void main(String[] args) throws Exception {
 		for (int i = 0; i < 5; i++) {
-			round(args, i>0);
+			round(args);
 		}
 	}
 
-	private static void round(String[] args, boolean needTimestamp) throws IOException, InterruptedException, ClassNotFoundException {
+	private static void round(String[] args) throws IOException, InterruptedException, ClassNotFoundException {
 		Configuration conf = new Configuration();
 		String[] otherArgs = new GenericOptionsParser(conf, args).getRemainingArgs();
 		if (otherArgs.length != 3) {
 			System.err.println("Usage: LR_BGD <data_folder> <weight_folder> <output_folder>");
 			System.exit(2);
 		}
-		Job job = new Job(conf, "LR_BGD");
+		Job job = Job.getInstance(conf, "LR_BGD");
 		job.setJarByClass(FileSysTest.class);
 		job.setMapperClass(BGDMapper.class);
 		job.setReducerClass(BGDReducer.class);
@@ -128,21 +118,7 @@ public class FileSysTest {
 		job.setOutputValueClass(FloatWritable.class);
 		FileInputFormat.addInputPath(job, new Path(otherArgs[0]));
 		FileOutputFormat.setOutputPath(job, new Path(otherArgs[2]));
-		// Configure the DistributedCache for weights file
-		try {
-			job.addCacheFile(new URI(otherArgs[1] + "/data.txt"+"#data.txt"));
-			if(needTimestamp){
-				String[] timestamps = job.getFileTimestamps();
-				String latestTime = timestamps[timestamps.length-1];
-				StringBuilder sb = new StringBuilder();
-				for(int i = 0;i<timestamps.length;i++)
-					sb.append(latestTime+",");
-				conf.set(MRJobConfig.CACHE_ARCHIVES_TIMESTAMPS, sb.toString());
-			}
-		} catch (URISyntaxException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
+
 		boolean finished = job.waitForCompletion(true);
 		// configuration should contain reference to your namenode
 		try {
@@ -153,24 +129,10 @@ public class FileSysTest {
 				fs.delete(outputFolder, true);
 			}
 			
-			FSDataInputStream in = fs.open(new Path("s3://finalapp/tmp/data.txt"));
-			FSDataOutputStream out = fs.create(new Path("s3://finalapp/weight/data.txt"));
-			byte [] b = new byte[1024];
-			int len;
-			while((len = in.read(b))!=-1){
-				out.write(b, 0, len);
-			}
-			in.close();
-			out.close();
-			
 		} catch (URISyntaxException e) {
 			e.printStackTrace();
 		}
-		String[] strs = job.getFileTimestamps();
-		StringBuilder sb = new StringBuilder();
-		for(String s : strs)
-			sb.append(s+" , ");
-		System.err.println(sb.toString());
+
 		if (!finished){			
 			System.err.println("Aborted!");
 			System.exit(finished ? 0 : 1);
