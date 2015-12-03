@@ -225,7 +225,6 @@ public class LR_BGD {
 
 		protected void cleanup(Context context) throws IOException, InterruptedException {
 			out.close();
-			fs.close();
 		}
 	}
 
