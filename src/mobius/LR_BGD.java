@@ -28,17 +28,19 @@ public class LR_BGD {
 	
 	public static final float LAMBDA =0.1f;
 	public static final int DIM = 7;
-	public final static float THRESHOLD = 0.2f;
-	public final static int MAX_ITERATION_NUM = 10;
-	public final static int MAX_AGE = 62;
+	public final static float THRESHOLD = 0.5f;
+	public final static int MAX_ITERATION_NUM = 3;
+	public final static int MAX_AGE = 45;
 	
-//	public static final String FILESYS_SCHEMA = "s3://finalapp";
-//	public static final String WEIGHT_DATA_PATH = "s3://finalapp/weight/data.txt";
-	
+	public static final String FILESYS_SCHEMA = "s3://finalapp";
+	public static final String WEIGHT_DATA_PATH = "s3://finalapp/weight/data.txt";
+	public static final String AGE_DATA_PATH = "s3://finalapp/age/data.txt";
+	public static final String OLD_MSE_DATA_PATH = "s3://finalapp/old/data.txt";
+
 //	public static final String FILESYS_SCHEMA = "file:///home/unoboros/workspace1/Mobius";
-	public static final String WEIGHT_DATA_PATH = "/home/unoboros/workspace1/Mobius/weight/data.txt";
-	public static final String AGE_DATA_PATH = "/home/unoboros/workspace1/Mobius/age/data.txt";
-	public static final String OLD_MSE_DATA_PATH = "/home/unoboros/workspace1/Mobius/old/data.txt";
+//	public static final String WEIGHT_DATA_PATH = "/home/unoboros/workspace1/Mobius/weight/data.txt";
+//	public static final String AGE_DATA_PATH = "/home/unoboros/workspace1/Mobius/age/data.txt";
+//	public static final String OLD_MSE_DATA_PATH = "/home/unoboros/workspace1/Mobius/old/data.txt";
 
 	public static class MSEMapper extends Mapper<Object, Text, Text, Text> {
 		public float[] weights = new float[DIM];
@@ -50,8 +52,8 @@ public class LR_BGD {
 		public void setup(Context context) throws IOException, InterruptedException {
 			
 			try {
-//				FileSystem fs = FileSystem.get(new URI(FILESYS_SCHEMA),context.getConfiguration());
-				FileSystem fs = FileSystem.get(context.getConfiguration());
+				FileSystem fs = FileSystem.get(new URI(FILESYS_SCHEMA),context.getConfiguration());
+//				FileSystem fs = FileSystem.get(context.getConfiguration());
 				FSDataInputStream in = fs.open(new Path(WEIGHT_DATA_PATH));
 				BufferedReader rdr = new BufferedReader(new InputStreamReader(in));
 				String line;
@@ -76,9 +78,9 @@ public class LR_BGD {
 			} catch (IOException e) {
 				throw new RuntimeException(e);
 			} 
-//			catch (URISyntaxException e) {
-//				e.printStackTrace();
-//			}
+			catch (URISyntaxException e) {
+				e.printStackTrace();
+			}
 		}
 
 		public void map(Object line, Text value, Context context) throws IOException, InterruptedException {
@@ -140,8 +142,8 @@ public class LR_BGD {
 		public void setup(Context context) throws IOException, InterruptedException {
 			
 			try {
-//				FileSystem fs = FileSystem.get(new URI(FILESYS_SCHEMA),context.getConfiguration());
-				FileSystem fs = FileSystem.get(context.getConfiguration());
+				FileSystem fs = FileSystem.get(new URI(FILESYS_SCHEMA),context.getConfiguration());
+//				FileSystem fs = FileSystem.get(context.getConfiguration());
 				FSDataInputStream in = fs.open(new Path(WEIGHT_DATA_PATH));
 				BufferedReader rdr = new BufferedReader(new InputStreamReader(in));
 				String line;
@@ -167,9 +169,9 @@ public class LR_BGD {
 			} catch (IOException e) {
 				throw new RuntimeException(e);
 			} 
-//			catch (URISyntaxException e) {
-//				e.printStackTrace();
-//			}
+			catch (URISyntaxException e) {
+				e.printStackTrace();
+			}
 		}
 
 		public void map(Object line, Text value, Context context) throws IOException, InterruptedException {
@@ -219,8 +221,8 @@ public class LR_BGD {
 		public void setup(Context context) throws IOException, InterruptedException {
 
 			try {
-//				fs = FileSystem.get(new URI(FILESYS_SCHEMA),context.getConfiguration());
-				fs = FileSystem.get(context.getConfiguration());
+				fs = FileSystem.get(new URI(FILESYS_SCHEMA),context.getConfiguration());
+//				fs = FileSystem.get(context.getConfiguration());
 				FSDataInputStream in = fs.open(new Path(WEIGHT_DATA_PATH));
 				BufferedReader rdr = new BufferedReader(new InputStreamReader(in));
 				String line;
@@ -239,9 +241,9 @@ public class LR_BGD {
 			} catch (IOException e) {
 				throw new RuntimeException(e);
 			} 
-//			catch (URISyntaxException e) {
-//				e.printStackTrace();
-//			}
+			catch (URISyntaxException e) {
+				e.printStackTrace();
+			}
 		}
 
 		public void reduce(Text key, Iterable<Text> values, Context context)
@@ -294,14 +296,15 @@ public class LR_BGD {
 		Configuration conf = new Configuration();
 		String[] otherArgs = new GenericOptionsParser(conf, args).getRemainingArgs();
 		float[] min_mse = new float[MAX_AGE+1];
-		if (otherArgs.length != 3) {
-			System.err.println("Usage: LR_BGD <data_folder> <weight_folder> <output_folder>");
+		if (otherArgs.length < 3) {
+			System.err.println("Usage: LR_BGD <data_folder> [<data_folder>...] <weight_folder> <output_folder>");
 			System.exit(2);
 		}
 		
 		for(int age=0; age<=MAX_AGE; age++){
 			
-			FileSystem fs = FileSystem.get(conf);
+//			FileSystem fs = FileSystem.get(conf);
+			FileSystem fs = FileSystem.get(new URI(FILESYS_SCHEMA),conf);
 			FSDataOutputStream out = fs.create(new Path(AGE_DATA_PATH));
 			out.write((""+age).getBytes());
 			out.close();
@@ -326,7 +329,8 @@ public class LR_BGD {
 			
 			count = 0;
 			
-			fs = FileSystem.get(conf);
+//			fs = FileSystem.get(conf);
+			fs = FileSystem.get(new URI(FILESYS_SCHEMA),conf);
 			FSDataInputStream in = fs.open(new Path(OLD_MSE_DATA_PATH));
 			BufferedReader rdr = new BufferedReader(new InputStreamReader(in));
 			float mse = Float.parseFloat(rdr.readLine());
@@ -345,7 +349,8 @@ public class LR_BGD {
 			 }
 		}
 		
-		FileSystem fs = FileSystem.get(conf);
+//		FileSystem fs = FileSystem.get(conf);
+		FileSystem fs = FileSystem.get(new URI(FILESYS_SCHEMA),conf);
 		FSDataOutputStream out = fs.create(new Path(AGE_DATA_PATH));
 		out.write((""+min_age).getBytes());
 		out.close();
@@ -364,16 +369,18 @@ public class LR_BGD {
 		jobBGD.setNumReduceTasks(1);
 		jobBGD.setOutputKeyClass(Text.class);
 		jobBGD.setOutputValueClass(Text.class);
-		FileInputFormat.addInputPath(jobBGD, new Path(otherArgs[0]));
-		FileOutputFormat.setOutputPath(jobBGD, new Path(otherArgs[2]));
+		for (int i = 0; i < otherArgs.length - 2; ++i) {
+			FileInputFormat.addInputPath(jobBGD, new Path(otherArgs[i]));
+		}
+		FileOutputFormat.setOutputPath(jobBGD, new Path(otherArgs[otherArgs.length - 1]));
 
 		boolean finished = jobBGD.waitForCompletion(false);
 
 		FileSystem fs;
-		Path outputFolder = new Path(otherArgs[2]);
+		Path outputFolder = new Path(otherArgs[otherArgs.length - 1]);
 		try {
-//			fs = FileSystem.get(new URI(FILESYS_SCHEMA),conf);
-			fs = FileSystem.get(conf);
+			fs = FileSystem.get(new URI(FILESYS_SCHEMA),conf);
+//			fs = FileSystem.get(conf);
 			// true stands for recursively deleting the folder you gave
 			if (fs.exists(outputFolder)) {
 				fs.delete(outputFolder, true);
@@ -398,8 +405,10 @@ public class LR_BGD {
 		jobMSE.setNumReduceTasks(1);
 		jobMSE.setOutputKeyClass(Text.class);
 		jobMSE.setOutputValueClass(Text.class);
-		FileInputFormat.addInputPath(jobMSE, new Path(otherArgs[0]));
-		FileOutputFormat.setOutputPath(jobMSE, new Path(otherArgs[2]));
+		for (int i = 0; i < otherArgs.length - 2; ++i) {
+			FileInputFormat.addInputPath(jobMSE, new Path(otherArgs[i]));
+		}
+		FileOutputFormat.setOutputPath(jobMSE, new Path(otherArgs[otherArgs.length - 1]));
 
 		finished = jobMSE.waitForCompletion(false);
 
@@ -413,9 +422,9 @@ public class LR_BGD {
 		long terminate = jobMSE.getCounters().findCounter(MSECounter.Terminate).getValue();
 
 		try {
-//			fs = FileSystem.get(new URI(FILESYS_SCHEMA),conf);
-			fs = FileSystem.get(conf);
-			FSDataInputStream in = fs.open(new Path(otherArgs[2]+"/part-r-00000"));
+			fs = FileSystem.get(new URI(FILESYS_SCHEMA),conf);
+//			fs = FileSystem.get(conf);
+			FSDataInputStream in = fs.open(new Path(otherArgs[otherArgs.length - 1]+"/part-r-00000"));
 			BufferedReader rdr = new BufferedReader(new InputStreamReader(in));
 			float mse = Float.parseFloat(rdr.readLine());
 			rdr.close();
